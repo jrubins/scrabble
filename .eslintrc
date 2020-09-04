@@ -17,7 +17,7 @@
   },
   "settings": {
     "react": {
-      "version": "16.4.2"
+      "version": "16.13.1"
     }
   },
   "overrides": [
@@ -87,6 +87,7 @@
     "react/react-in-jsx-scope": 2,
     "react/sort-comp": 2,
     "react/void-dom-elements-no-children": 2,
+    "react-hooks/exhaustive-deps": 2,
     "react-hooks/rules-of-hooks": 2,
     "require-path-exists/notEmpty": 2,
     "require-path-exists/tooManyArguments": 2,

@@ -13,5 +13,5 @@ module.exports = {
     base: path.resolve(__dirname, '.'),
     dist: path.resolve(__dirname, 'dist'),
   },
-  webpackDevServerPort: 9001,
+  webpackDevServerPort: 9051,
 }

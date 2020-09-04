@@ -1,0 +1,67 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.user-letters {
+  display: flex;
+
+  margin: 20px 0;
+
+  .user-letter-cell {
+    margin: 0 2px;
+  }
+}
+
+.user-letter-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: $cell-size;
+  height: $cell-size;
+  border: 1px solid $medium-gray;
+  background-color: $yellow;
+
+  font-size: 18px;
+}
+
+.board {
+  display: grid;
+
+  width: $cell-size * 15;
+  border: 2px solid $medium-gray;
+  box-shadow: 1px 1px 5px $medium-gray;
+
+  grid-template-columns: repeat(15, 1fr);
+}
+
+.board-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  height: $cell-size;
+  border: $cell-outline;
+  border-right: none;
+  border-bottom: none;
+
+  &:nth-child(15n) {
+    border-right: $cell-outline;
+  }
+
+  &:nth-child(n + 211) {
+    border-bottom: $cell-outline;
+  }
+}
+
+.board-cell-hovered {
+  background-color: $medium-gray;
+}
+
+.board-cell-taken {
+  background-color: $yellow;
+
+  box-shadow: inset 1px 1px 3px -2px $black, inset -1px -1px 3px -2px $black;
+}

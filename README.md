@@ -1,3 +1,3 @@
-## React Template
+## Scrabble
 
-A template repository for creating React.js projects.
+A Scrabble game.

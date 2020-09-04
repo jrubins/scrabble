@@ -1,6 +1,10 @@
 // Colors. Color names from: http://chir.ag/projects/name-that-color
+$beige: #e0dbc4;
 $black: #000;
+$lightest-gray: #efefef;
+$medium-gray: #8c8c8c;
 $white: #fff;
+$yellow: #ead68e;
 
 // Fonts.
 $font-face: Helvetica, sans-serif;
@@ -13,3 +17,7 @@ $screen-md-min: 768px;
 $screen-md-max: 1024px;
 $screen-lg-min: 1230px;
 $screen-lg-max: 1366px;
+
+// Semantic variables.
+$cell-outline: 2px solid $lightest-gray;
+$cell-size: 40px;
