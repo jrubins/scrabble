@@ -1,7 +1,54 @@
-.app {
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+
+  width: $sidebar-width;
+  height: 100vh;
+  padding: 20px 40px 40px;
+  border-right: 1px solid $black;
+  background-color: $white;
+}
+
+.sidebar-logo {
+  font-family: 'Caveat';
+  font-size: 40px;
+}
+
+.scores-header,
+.scores-table-row {
+  display: flex;
+  justify-content: space-between;
+
+  > div {
+    padding: 5px;
+
+    &:nth-child(1) {
+      width: 20px;
+      color: $medium-gray;
+    }
+
+    &:nth-child(2),
+    &:nth-child(3) {
+      width: 40%;
+    }
+  }
+}
+
+.scores-header {
+  border-bottom: 1px solid $lightest-gray;
+}
+
+.scores-header-player-up {
+  font-weight: bold;
+}
+
+.playing-surface {
   display: flex;
   flex-direction: column;
   align-items: center;
+
+  margin-left: $sidebar-width;
 }
 
 .rack-letters {
@@ -15,16 +62,9 @@
 }
 
 .rack-letter {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
   width: $cell-size;
   height: $cell-size;
-  border: 1px solid $medium-gray;
-  background-color: $yellow;
-
-  font-size: 18px;
+  background-color: $light-medium-gray;
 }
 
 .board {
@@ -62,12 +102,32 @@
 }
 
 .board-cell-taken {
-  background-color: $yellow;
+  position: relative;
 
-  box-shadow: inset 1px 1px 3px -2px $black, inset -1px -1px 3px -2px $black;
+  .tile {
+    position: absolute;
+    top: -1px;
+    left: -1px;
+
+    width: $cell-size - 2px;
+    height: $cell-size - 2px;
+  }
 }
 
 .tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: $cell-size;
+  height: $cell-size;
+  background-color: $yellow;
+
+  font-size: 18px;
+  box-shadow: -1px -1px 1px $white, 1px 1px 1px $medium-gray;
+}
+
+.tile-letter-container {
   position: relative;
 
   .tile-points {

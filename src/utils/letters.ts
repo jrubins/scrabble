@@ -105,6 +105,15 @@ export function getRackLetters({
 /**
  * Returns a full set of letters.
  */
-export function getSetOfLetters() {
+export function getSetOfLetters(): LetterDistribution {
   return { ...LETTER_DISTRIBUTION }
+}
+
+/**
+ * Returns the score for a word represented by its letters.
+ */
+export function getScore({ letters }: { letters: RackLetter[] }) {
+  return letters.reduce((sum, currentLetter) => {
+    return sum + LETTER_POINTS[currentLetter.letter]
+  }, 0)
 }
