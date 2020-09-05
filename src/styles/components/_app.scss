@@ -32,6 +32,7 @@
 
   width: $cell-size * 15;
   border: 2px solid $medium-gray;
+  background-color: $beige;
   box-shadow: 1px 1px 5px $medium-gray;
 
   grid-template-columns: repeat(15, 1fr);
@@ -64,4 +65,18 @@
   background-color: $yellow;
 
   box-shadow: inset 1px 1px 3px -2px $black, inset -1px -1px 3px -2px $black;
+}
+
+.tile {
+  position: relative;
+
+  .tile-points {
+    position: absolute;
+    bottom: -2px;
+    left: calc(100% + 1px);
+  }
+}
+
+.tile-points {
+  font-size: 10px;
 }

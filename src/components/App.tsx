@@ -9,8 +9,8 @@ import {
   Events as ScrabbleEvents,
   scrabbleMachine,
 } from './machines/scrabbleMachine'
+import { LETTER_POINTS } from '../utils/letters'
 import { UserLetter } from '../utils/types'
-import { getRandomLetters } from '../utils/letters'
 
 const board: number[] = []
 for (let i = 0; i < 225; i++) {
@@ -19,10 +19,7 @@ for (let i = 0; i < 225; i++) {
 
 const App = () => {
   const [scrabbleState, send] = useMachine<ScrabbleContext, ScrabbleEvents>(
-    scrabbleMachine.withContext({
-      ...(scrabbleMachine.context as ScrabbleContext),
-      userLetters: getRandomLetters({ numLetters: 7 }),
-    })
+    scrabbleMachine
   )
   const { letters, userLetters, usedLetters } = scrabbleState.context
 
@@ -47,12 +44,18 @@ const App = () => {
   return (
     <div className="app">
       <div className="user-letters">
-        {userLetters.map((letter) => {
+        {userLetters.map((userLetter) => {
           return (
             <UserLetterCell
-              key={letter.id}
-              letter={usedLetters.has(letter.id) ? null : letter}
+              key={userLetter.id}
               onDragStart={onDragStart}
+              onLetterDropped={() => {
+                send({
+                  userLetterId: userLetter.id,
+                  type: SCRABBLE_EVENTS.TILE_PLACED_ON_RACK,
+                })
+              }}
+              userLetter={usedLetters.has(userLetter.id) ? null : userLetter}
             />
           )
         })}
@@ -65,7 +68,7 @@ const App = () => {
               letter={letters[cellNum]}
               onDragStart={onDragStart}
               onLetterDropped={() => {
-                send({ cellNum, type: SCRABBLE_EVENTS.DRAG_STOPPED })
+                send({ cellNum, type: SCRABBLE_EVENTS.TILE_PLACED_ON_BOARD })
               }}
             />
           )
@@ -76,16 +79,29 @@ const App = () => {
 }
 
 const UserLetterCell: React.FC<{
-  letter: UserLetter | null
   onDragStart: (letter: UserLetter) => void
-}> = ({ letter, onDragStart }) => {
+  onLetterDropped: () => void
+  userLetter: UserLetter | null
+}> = ({ onDragStart, onLetterDropped, userLetter }) => {
+  const letter = userLetter?.letter
+
+  function onDragOver(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+  }
+
+  function onDrop() {
+    onLetterDropped()
+  }
+
   return (
     <div
       className="user-letter-cell"
       draggable="true"
-      onDragStart={letter ? () => onDragStart(letter) : undefined}
+      onDragOver={onDragOver}
+      onDragStart={userLetter ? () => onDragStart(userLetter) : undefined}
+      onDrop={onDrop}
     >
-      {letter?.letter}
+      {letter && <Tile letter={letter} />}
     </div>
   )
 }
@@ -124,7 +140,16 @@ const BoardCell: React.FC<{
       onDragStart={letter ? () => onDragStart(letter) : undefined}
       onDrop={onDrop}
     >
-      {cellLetter}
+      {cellLetter && <Tile letter={cellLetter} />}
+    </div>
+  )
+}
+
+const Tile: React.FC<{ letter: string }> = ({ letter }) => {
+  return (
+    <div className="tile">
+      <span>{letter}</span>
+      <div className="tile-points">{LETTER_POINTS[letter]}</div>
     </div>
   )
 }
