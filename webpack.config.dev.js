@@ -68,7 +68,12 @@ module.exports = {
   },
   plugins: [
     // This is a shorthand plugin for the DefinePlugin.
-    new webpack.EnvironmentPlugin(['APP_ENV', 'NODE_ENV', 'PUSHER_APP_KEY']),
+    new webpack.EnvironmentPlugin([
+      'API_BASE_URL',
+      'APP_ENV',
+      'NODE_ENV',
+      'PUSHER_APP_KEY',
+    ]),
     new HtmlWebpackPlugin({
       favicon: buildConfig.paths.app.favicon,
       // "inject: true" places all JavaScript resources at the bottom of the body element.

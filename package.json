@@ -10,7 +10,7 @@
     "lint": "yarn --production=false && yarn lint:js",
     "lint:js": "eslint src babel.config.js buildConfig.js postcss.config.js prettier.config.js webpack.config.dev.js webpack.config.prod.js --cache --ext=.js,.jsx,.ts,.tsx",
     "lint:sass": "sass-lint -v -q",
-    "start": "yarn && APP_ENV=development NODE_ENV=development PUSHER_APP_KEY=57fda54b4022644bf642 webpack-dev-server --progress --config webpack.config.dev.js"
+    "start": "yarn && API_BASE_URL=/api APP_ENV=development NODE_ENV=development PUSHER_APP_KEY=57fda54b4022644bf642 webpack-dev-server --progress --config webpack.config.dev.js"
   },
   "engines": {
     "node": "12.18.3",

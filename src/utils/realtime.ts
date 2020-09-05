@@ -59,7 +59,7 @@ export function initRealtimeConnection({
 
   pusher = new Pusher(pusherAppKey, {
     auth: { params: { userId, userName } },
-    authEndpoint: '/api/pusher-auth',
+    authEndpoint: `${process.env.API_BASE_URL}/pusher-auth`,
     cluster: 'us2',
   })
 
