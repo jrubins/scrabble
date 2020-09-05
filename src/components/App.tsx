@@ -10,7 +10,7 @@ import {
   scrabbleMachine,
 } from './machines/scrabbleMachine'
 import { LETTER_POINTS } from '../utils/letters'
-import { UserLetter } from '../utils/types'
+import { RackLetter as RackLetterType } from '../utils/types'
 
 const board: number[] = []
 for (let i = 0; i < 225; i++) {
@@ -21,9 +21,9 @@ const App = () => {
   const [scrabbleState, send] = useMachine<ScrabbleContext, ScrabbleEvents>(
     scrabbleMachine
   )
-  const { letters, userLetters, usedLetters } = scrabbleState.context
+  const { boardLetters, rackLetters, turnUsedLetters } = scrabbleState.context
 
-  function onDragStart(letter: UserLetter) {
+  function onDragStart(letter: RackLetterType) {
     send({ letter, type: SCRABBLE_EVENTS.DRAG_STARTED })
   }
 
@@ -43,19 +43,21 @@ const App = () => {
 
   return (
     <div className="app">
-      <div className="user-letters">
-        {userLetters.map((userLetter) => {
+      <div className="rack-letters">
+        {rackLetters.map((rackLetter) => {
           return (
-            <UserLetterCell
-              key={userLetter.id}
+            <RackLetter
+              key={rackLetter.id}
               onDragStart={onDragStart}
               onLetterDropped={() => {
                 send({
-                  userLetterId: userLetter.id,
+                  rackLetterId: rackLetter.id,
                   type: SCRABBLE_EVENTS.TILE_PLACED_ON_RACK,
                 })
               }}
-              userLetter={usedLetters.has(userLetter.id) ? null : userLetter}
+              rackLetter={
+                turnUsedLetters.has(rackLetter.id) ? null : rackLetter
+              }
             />
           )
         })}
@@ -65,7 +67,7 @@ const App = () => {
           return (
             <BoardCell
               key={cellNum}
-              letter={letters[cellNum]}
+              letter={boardLetters[cellNum]}
               onDragStart={onDragStart}
               onLetterDropped={() => {
                 send({ cellNum, type: SCRABBLE_EVENTS.TILE_PLACED_ON_BOARD })
@@ -78,12 +80,12 @@ const App = () => {
   )
 }
 
-const UserLetterCell: React.FC<{
-  onDragStart: (letter: UserLetter) => void
+const RackLetter: React.FC<{
+  onDragStart: (letter: RackLetterType) => void
   onLetterDropped: () => void
-  userLetter: UserLetter | null
-}> = ({ onDragStart, onLetterDropped, userLetter }) => {
-  const letter = userLetter?.letter
+  rackLetter: RackLetterType | null
+}> = ({ onDragStart, onLetterDropped, rackLetter }) => {
+  const letter = rackLetter?.letter
 
   function onDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -95,10 +97,10 @@ const UserLetterCell: React.FC<{
 
   return (
     <div
-      className="user-letter-cell"
+      className="rack-letter"
       draggable="true"
       onDragOver={onDragOver}
-      onDragStart={userLetter ? () => onDragStart(userLetter) : undefined}
+      onDragStart={rackLetter ? () => onDragStart(rackLetter) : undefined}
       onDrop={onDrop}
     >
       {letter && <Tile letter={letter} />}
@@ -107,8 +109,8 @@ const UserLetterCell: React.FC<{
 }
 
 const BoardCell: React.FC<{
-  letter?: UserLetter
-  onDragStart: (letter: UserLetter) => void
+  letter?: RackLetterType
+  onDragStart: (letter: RackLetterType) => void
   onLetterDropped: () => void
 }> = ({ letter, onDragStart, onLetterDropped }) => {
   const [isOver, setIsOver] = useState(false)

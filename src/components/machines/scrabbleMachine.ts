@@ -1,8 +1,8 @@
 import { Machine, assign } from 'xstate'
 import _ from 'lodash'
 
-import { LetterDistribution, UserLetter } from '../../utils/types'
-import { getSetOfLetters, getUserLetters } from '../../utils/letters'
+import { LetterDistribution, RackLetter } from '../../utils/types'
+import { getRackLetters, getSetOfLetters } from '../../utils/letters'
 
 enum ACTIONS {
   PICK_INITIAL_LETTERS = 'PICK_INITIAL_LETTERS',
@@ -24,18 +24,18 @@ enum STATES {
 }
 
 export interface Context {
-  letter: UserLetter | null
-  letters: Partial<{ [cellNum: number]: UserLetter }>
+  boardLetters: Partial<{ [cellNum: number]: RackLetter }>
+  draggingLetter: RackLetter | null
+  rackLetters: RackLetter[]
+  rackLettersToBoardCells: { [id: string]: number }
   remainingLetters: LetterDistribution
-  usedLetters: Set<string>
-  userLetters: UserLetter[]
-  userLettersToCells: { [id: string]: number }
+  turnUsedLetters: Set<string>
 }
 
-type DragStarted = { letter: UserLetter; type: EVENTS.DRAG_STARTED }
+type DragStarted = { letter: RackLetter; type: EVENTS.DRAG_STARTED }
 type TilePlacedOnBoard = { cellNum: number; type: EVENTS.TILE_PLACED_ON_BOARD }
 type TilePlacedOnRack = {
-  userLetterId: string
+  rackLetterId: string
   type: EVENTS.TILE_PLACED_ON_RACK
 }
 type WordSubmitted = { type: EVENTS.WORD_SUBMITTED }
@@ -48,12 +48,12 @@ export type Events =
 export const scrabbleMachine = Machine<Context, Events>(
   {
     context: {
-      letter: null,
-      letters: {},
+      boardLetters: {},
+      draggingLetter: null,
+      rackLetters: [],
+      rackLettersToBoardCells: {},
       remainingLetters: getSetOfLetters(),
-      usedLetters: new Set(),
-      userLetters: [],
-      userLettersToCells: {},
+      turnUsedLetters: new Set(),
     },
     initial: STATES.PLAYING,
     states: {
@@ -79,27 +79,27 @@ export const scrabbleMachine = Machine<Context, Events>(
       [ACTIONS.PICK_INITIAL_LETTERS]: assign((context) => {
         return {
           ...context,
-          ...getUserLetters({
+          ...getRackLetters({
             numLetters: 7,
             remainingLetters: context.remainingLetters,
           }),
         }
       }),
       [ACTIONS.PICK_NEW_LETTERS]: assign((context) => {
-        const { remainingLetters, usedLetters, userLetters } = context
+        const { rackLetters, remainingLetters, turnUsedLetters } = context
         const {
+          rackLetters: newLettersToAdd,
           remainingLetters: newRemainingLetters,
-          userLetters: newLettersToAdd,
-        } = getUserLetters({
-          numLetters: usedLetters.size,
+        } = getRackLetters({
+          numLetters: turnUsedLetters.size,
           remainingLetters,
         })
 
         // We use this map instead of an array concatenation to maintain the user's tile order.
-        const newUserLetters = userLetters.map((letter) => {
+        const newRackLetters = rackLetters.map((letter) => {
           // If this letter was used in the user's last round, take one of the new letters.
-          if (usedLetters.has(letter.id)) {
-            return newLettersToAdd.pop() as UserLetter
+          if (turnUsedLetters.has(letter.id)) {
+            return newLettersToAdd.pop() as RackLetter
           }
 
           return letter
@@ -107,87 +107,94 @@ export const scrabbleMachine = Machine<Context, Events>(
 
         return {
           ...context,
+          rackLetters: newRackLetters,
           remainingLetters: newRemainingLetters,
-          usedLetters: new Set(),
-          userLetters: newUserLetters,
+          turnUsedLetters: new Set(),
         }
       }),
       [ACTIONS.SET_LETTER_ON_BOARD]: assign<Context>((context, event) => {
-        const { letter, letters, usedLetters, userLettersToCells } = context
+        const {
+          boardLetters,
+          draggingLetter,
+          rackLettersToBoardCells,
+          turnUsedLetters,
+        } = context
         const { cellNum } = event as TilePlacedOnBoard
 
-        if (!letter || letters[cellNum]) {
+        if (!draggingLetter || boardLetters[cellNum]) {
           return { ...context, letter: null }
         }
 
-        const newLetters = {
-          ...letters,
-          [cellNum]: letter,
+        const newBoardLetters = {
+          ...boardLetters,
+          [cellNum]: draggingLetter,
         }
 
-        const newUsedLetters = new Set(usedLetters)
-        newUsedLetters.add(letter.id)
+        const newTurnUsedLetters = new Set(turnUsedLetters)
+        newTurnUsedLetters.add(draggingLetter.id)
 
-        const newUserLettersToCells = { ...userLettersToCells }
-        const oldCellNum = newUserLettersToCells[letter.id]
+        const newRackLettersToBoardCells = { ...rackLettersToBoardCells }
+        const oldCellNum = newRackLettersToBoardCells[draggingLetter.id]
         if (oldCellNum) {
-          delete newLetters[oldCellNum]
+          delete newBoardLetters[oldCellNum]
         }
-        newUserLettersToCells[letter.id] = cellNum
+        newRackLettersToBoardCells[draggingLetter.id] = cellNum
 
         return {
           ...context,
-          letter: null,
-          letters: newLetters,
-          usedLetters: newUsedLetters,
-          userLettersToCells: newUserLettersToCells,
+          boardLetters: newBoardLetters,
+          draggingLetter: null,
+          rackLettersToBoardCells: newRackLettersToBoardCells,
+          turnUsedLetters: newTurnUsedLetters,
         }
       }),
       [ACTIONS.SET_LETTER_ON_RACK]: assign<Context>((context, event) => {
         const {
-          letter,
-          letters,
-          usedLetters,
-          userLetters,
-          userLettersToCells,
+          boardLetters,
+          draggingLetter,
+          rackLetters,
+          rackLettersToBoardCells,
+          turnUsedLetters,
         } = context
-        const { userLetterId } = event as TilePlacedOnRack
+        const { rackLetterId } = event as TilePlacedOnRack
 
-        if (!letter) {
+        if (!draggingLetter) {
           return context
         }
 
-        const newUsedLetters = new Set(usedLetters)
-        newUsedLetters.delete(letter.id)
+        const newTurnUsedLetters = new Set(turnUsedLetters)
+        newTurnUsedLetters.delete(draggingLetter.id)
 
-        const newLetters = { ...letters }
-        const newUserLettersToCells = { ...userLettersToCells }
-        const oldCellNum = newUserLettersToCells[letter.id]
+        const newBoardLetters = { ...boardLetters }
+        const newRackLettersToBoardCells = { ...rackLettersToBoardCells }
+        const oldCellNum = newRackLettersToBoardCells[draggingLetter.id]
         if (oldCellNum) {
-          delete newLetters[oldCellNum]
+          delete newBoardLetters[oldCellNum]
         }
-        delete newUserLettersToCells[letter.id]
+        delete newRackLettersToBoardCells[draggingLetter.id]
 
-        const newUserLetters = _.cloneDeep(userLetters)
-        const newRackIndex = _.findIndex(userLetters, { id: userLetterId })
-        const oldRackIndex = _.findIndex(userLetters, { id: letter.id })
+        const newRackLetters = _.cloneDeep(rackLetters)
+        const newRackIndex = _.findIndex(newRackLetters, { id: rackLetterId })
+        const oldRackIndex = _.findIndex(newRackLetters, {
+          id: draggingLetter.id,
+        })
         if (newRackIndex !== oldRackIndex) {
-          const temp = newUserLetters[newRackIndex]
-          newUserLetters[newRackIndex] = newUserLetters[oldRackIndex]
-          newUserLetters[oldRackIndex] = temp
+          const temp = newRackLetters[newRackIndex]
+          newRackLetters[newRackIndex] = newRackLetters[oldRackIndex]
+          newRackLetters[oldRackIndex] = temp
         }
 
         return {
           ...context,
-          letter: null,
-          letters: newLetters,
-          usedLetters: newUsedLetters,
-          userLetters: newUserLetters,
-          userLettersToCells: newUserLettersToCells,
+          boardLetters: newBoardLetters,
+          draggingLetter: null,
+          rackLetters: newRackLetters,
+          rackLettersToBoardCells: newRackLettersToBoardCells,
+          turnUsedLetters: newTurnUsedLetters,
         }
       }),
       [ACTIONS.UPDATE_LETTER]: assign({
-        letter: (_context, event) => (event as DragStarted).letter,
+        draggingLetter: (_context, event) => (event as DragStarted).letter,
       }),
     },
   }

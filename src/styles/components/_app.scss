@@ -4,17 +4,17 @@
   align-items: center;
 }
 
-.user-letters {
+.rack-letters {
   display: flex;
 
   margin: 20px 0;
 
-  .user-letter-cell {
+  .rack-letter {
     margin: 0 2px;
   }
 }
 
-.user-letter-cell {
+.rack-letter {
   display: flex;
   align-items: center;
   justify-content: center;

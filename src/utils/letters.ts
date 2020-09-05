@@ -1,7 +1,7 @@
 import _ from 'lodash'
 import { v4 as uuidV4 } from 'uuid'
 
-import { UserLetter, LetterDistribution } from './types'
+import { LetterDistribution, RackLetter } from './types'
 
 const LETTER_DISTRIBUTION = {
   A: 9,
@@ -62,23 +62,16 @@ export const LETTER_POINTS = {
 }
 
 /**
- * Returns a full set of letters.
- */
-export function getSetOfLetters() {
-  return { ...LETTER_DISTRIBUTION }
-}
-
-/**
  * Returns a random selection of available letters.
  */
-export function getUserLetters({
+export function getRackLetters({
   numLetters,
   remainingLetters,
 }: {
   numLetters: number
   remainingLetters: LetterDistribution
-}): { remainingLetters: LetterDistribution; userLetters: UserLetter[] } {
-  const userLetters: UserLetter[] = []
+}): { rackLetters: RackLetter[]; remainingLetters: LetterDistribution } {
+  const rackLetters: RackLetter[] = []
   const newRemainingLetters = { ...remainingLetters }
 
   // Get all letters that still are available in the letter distribution.
@@ -86,7 +79,7 @@ export function getUserLetters({
     return newRemainingLetters[letter] > 0
   })
 
-  while (userLetters.length < numLetters && availableLetters.length > 0) {
+  while (rackLetters.length < numLetters && availableLetters.length > 0) {
     const randomLetter = _.shuffle(availableLetters)[0]
     newRemainingLetters[randomLetter] = Math.max(
       newRemainingLetters[randomLetter] - 1,
@@ -100,11 +93,18 @@ export function getUserLetters({
       })
     }
 
-    userLetters.push({
+    rackLetters.push({
       id: uuidV4(),
       letter: randomLetter,
     })
   }
 
-  return { remainingLetters: newRemainingLetters, userLetters }
+  return { rackLetters, remainingLetters: newRemainingLetters }
+}
+
+/**
+ * Returns a full set of letters.
+ */
+export function getSetOfLetters() {
+  return { ...LETTER_DISTRIBUTION }
 }
