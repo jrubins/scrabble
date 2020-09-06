@@ -90,12 +90,10 @@ img {
 
 a,
 a:focus {
-  text-decoration: none;
-  cursor: pointer;
-}
+  color: $blue;
 
-a:hover {
   text-decoration: underline;
+  cursor: pointer;
 }
 
 label {

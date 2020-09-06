@@ -1,16 +1,20 @@
 import React from 'react'
 
 const Input: React.FC<{
+  name: string
   onChange: (value: string) => void
+  type: 'number' | 'text'
   value: string
-}> = ({ onChange, value }) => {
+}> = ({ name, onChange, value, type }) => {
   return (
     <input
       className="input"
+      id={name}
+      name={name}
       onChange={(event) => {
         onChange(event.target.value)
       }}
-      type="text"
+      type={type}
       value={value}
     />
   )

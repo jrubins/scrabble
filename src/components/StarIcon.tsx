@@ -1,6 +1,6 @@
 import React from 'react'
 
-const StarIcon = () => {
+const StarIcon: React.FC = () => {
   return (
     <svg className="star-icon" viewBox="0 0 24 24">
       <path d="M0 0h24v24H0z" fill="none" />

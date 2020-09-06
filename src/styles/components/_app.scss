@@ -11,9 +11,37 @@
 }
 
 .sidebar-logo {
+  margin-bottom: 20px;
+
   font-family: 'Caveat';
   font-size: 40px;
   line-height: 1;
+}
+
+.enter-room-form {
+  label {
+    margin-bottom: 2px;
+
+    font-size: 12px;
+  }
+
+  input {
+    margin-bottom: 10px;
+  }
+
+  button {
+    margin-top: 20px;
+  }
+}
+
+.players-in-room {
+  margin-bottom: 20px;
+}
+
+.players-in-room-header {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
 }
 
 .scores-header,
@@ -46,20 +74,148 @@
 
 .playing-surface {
   display: flex;
+  position: relative;
+
+  min-height: 100vh;
+  margin-left: $sidebar-width;
+}
+
+.playing-surface-items {
+  display: flex;
   flex-direction: column;
   align-items: center;
 
-  margin-left: $sidebar-width;
+  margin-left: 125px;
+}
+
+.swap-modal-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+
+  background-color: $faded-white;
+}
+
+.swap-modal {
+  position: absolute;
+  top: 20px;
+  left: 225px;
+
+  width: 400px;
+  padding: 40px;
+  border-radius: 0;
+  background-color: $white;
+  box-shadow: 1px 1px 8px $medium-gray;
+
+  .close-icon {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.swap-modal-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.swap-modal-title {
+  font-size: 16px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.swap-modal-choose-tiles {
+  display: flex;
+  justify-content: space-between;
+}
+
+.rack-letter-to-swap {
+  position: relative;
+
+  cursor: pointer;
+
+  .checkmark-icon {
+    position: absolute;
+    top: 0;
+    right: 0;
+
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.swap-modal-actions {
+  margin-top: 40px;
+
+  text-align: right;
+
+  button {
+    width: 100px;
+    margin-left: 10px;
+  }
+}
+
+.above-board-row {
+  display: flex;
+  position: relative;
+  justify-content: center;
+
+  width: 100%;
+
+  .shuffle-icon,
+  .swap-icon {
+    width: 28px;
+    height: 28px;
+
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .swap-icon-container {
+    position: absolute;
+    top: 50%;
+    right: 0;
+
+    transform: translateY(-50%);
+  }
 }
 
 .rack-letters {
   display: flex;
+  position: relative;
 
   margin: 20px 0;
+
+  .shuffle-icon-container {
+    position: absolute;
+    top: 50%;
+    left: -45px;
+
+    transform: translateY(-50%);
+  }
 
   .rack-letter {
     margin: 0 2px;
   }
+}
+
+.shuffle-icon-container,
+.swap-icon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.shuffle-icon-text,
+.swap-icon-text {
+  font-size: 7px;
+  text-transform: uppercase;
 }
 
 .rack-letter {
@@ -180,8 +336,14 @@
   width: 100%;
   height: 35px;
   border: 1px solid $black;
-  background: none;
+  background: $black;
+  color: $white;
 
   font-size: 12px;
   text-transform: uppercase;
+}
+
+.button-inverse {
+  background-color: $white;
+  color: $black;
 }

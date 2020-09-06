@@ -3,6 +3,7 @@ import React, { DragEvent, useEffect, useState } from 'react'
 import { Route, Switch, useHistory, useParams } from 'react-router-dom'
 import { useMachine } from '@xstate/react'
 import { v4 as uuidV4 } from 'uuid'
+import _ from 'lodash'
 import cn from 'classnames'
 
 import {
@@ -21,8 +22,12 @@ import { getPersistedInfo } from '../utils/storage'
 import { info } from '../utils/logs'
 
 import Button from './Button'
+import CheckmarkIcon from './CheckmarkIcon'
+import CloseIcon from './CloseIcon'
 import Input from './Input'
+import ShuffleIcon from './ShuffleIcon'
 import StarIcon from './StarIcon'
+import SwapIcon from './SwapIcon'
 
 const board: number[] = []
 for (let i = 0; i < 225; i++) {
@@ -58,6 +63,9 @@ const Room: React.FC = () => {
     }),
     {
       actions: {
+        [SCRABBLE_ACTIONS.UPDATE_URL_WITH_ROOM]: (context) => {
+          history.push(`/${context.roomName}`)
+        },
         [SCRABBLE_ACTIONS.JOIN_ROOM]: (context) => {
           const { players, roomName } = context
           const userId = players[0].id
@@ -118,9 +126,11 @@ const Room: React.FC = () => {
     playerUp,
     players,
     rackLetters,
+    rackLettersToSwap,
     roomHost,
     roomName,
     rounds,
+    showSwapModal,
     turnUsedLetters,
   } = scrabbleState.context
   const isCreatingRoom = scrabbleState.matches(SCRABBLE_STATES.CREATING_ROOM)
@@ -135,6 +145,7 @@ const Room: React.FC = () => {
     scrabbleState.matches(SCRABBLE_STATES.PLAYING) ||
     scrabbleState.matches(SCRABBLE_STATES.WAITING_FOR_TURN)
   const me = getMe(players)
+  const isHost = me ? me.id === roomHost : false
 
   function onDragStart(letter: RackLetterType) {
     send({ letter, type: SCRABBLE_EVENTS.DRAG_STARTED })
@@ -180,7 +191,6 @@ const Room: React.FC = () => {
                 send({ type: SCRABBLE_EVENTS.JOIN_ROOM })
               } else {
                 send({ type: SCRABBLE_EVENTS.CREATE_ROOM })
-                history.push(`/${roomName}`)
               }
             }}
             roomName={roomName}
@@ -189,28 +199,41 @@ const Room: React.FC = () => {
         {isDeterminingGameState && <div>Loading...</div>}
         {isWaitingForPlayers && (
           <div>
-            {players.length < 2 && <div>Waiting for players to join...</div>}
+            {players.length < 2 && isHost && (
+              <>
+                <p>
+                  Invite players to this room by sending them the below link.
+                </p>
+                <a
+                  onClick={() => {
+                    navigator.clipboard.writeText(window.location.href)
+                  }}
+                >
+                  Copy link to room
+                </a>
+              </>
+            )}
             {players.length >= 2 && (
               <>
-                <div>
-                  <div>Players</div>
+                <div className="players-in-room">
+                  <div className="players-in-room-header">Players</div>
                   {players.map((player) => {
-                    return (
-                      <div key={player.id}>
-                        {player.name}
-                        {player.thisPlayer ? '(You)' : ''}
-                      </div>
-                    )
+                    return <div key={player.id}>{player.name}</div>
                   })}
                 </div>
-                {players.length === 2 && me?.id === roomHost && (
-                  <Button
-                    onClick={() => {
-                      send({ type: SCRABBLE_EVENTS.START_GAME })
-                    }}
-                  >
-                    Start Game
-                  </Button>
+                {players.length === 2 && (
+                  <>
+                    {!isHost && <div>Waiting for host to start game...</div>}
+                    {isHost && (
+                      <Button
+                        onClick={() => {
+                          send({ type: SCRABBLE_EVENTS.START_GAME })
+                        }}
+                      >
+                        Start Game
+                      </Button>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -259,45 +282,139 @@ const Room: React.FC = () => {
                   </div>
                 )
               })}
+              <div className="scores-table-row">
+                <div></div>
+                <div>
+                  {rounds.reduce((sum, round) => {
+                    return sum + (round[players[0].id]?.score || 0)
+                  }, 0)}
+                </div>
+                <div>
+                  {rounds.reduce((sum, round) => {
+                    return sum + (round[players[1].id]?.score || 0)
+                  }, 0)}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
       <div className="playing-surface">
-        <div className="rack-letters">
-          {rackLetters.map((rackLetter) => {
-            return (
-              <RackLetter
-                key={rackLetter.id}
-                onDragStart={onDragStart}
-                onLetterDropped={() => {
-                  send({
-                    rackLetterId: rackLetter.id,
-                    type: SCRABBLE_EVENTS.TILE_PLACED_ON_RACK,
-                  })
+        <div className="playing-surface-items">
+          <div className="above-board-row">
+            <div className="rack-letters">
+              {!isPlaying &&
+                _.fill(new Array(7), null).map((rackLetter, i) => {
+                  return <RackLetter key={i} rackLetter={rackLetter} />
+                })}
+              {isPlaying && (
+                <>
+                  <div className="shuffle-icon-container">
+                    <ShuffleIcon
+                      onClick={() => {
+                        send({ type: SCRABBLE_EVENTS.SHUFFLE_RACK })
+                      }}
+                    />
+                    <div className="shuffle-icon-text">Shuffle</div>
+                  </div>
+                  {rackLetters.map((rackLetter) => {
+                    return (
+                      <RackLetter
+                        key={rackLetter.id}
+                        onDragStart={onDragStart}
+                        onLetterDropped={() => {
+                          send({
+                            rackLetterId: rackLetter.id,
+                            type: SCRABBLE_EVENTS.TILE_PLACED_ON_RACK,
+                          })
+                        }}
+                        rackLetter={
+                          turnUsedLetters.has(rackLetter.id) ? null : rackLetter
+                        }
+                      />
+                    )
+                  })}
+                </>
+              )}
+            </div>
+            <div className="swap-icon-container">
+              <SwapIcon
+                onClick={() => {
+                  send({ type: SCRABBLE_EVENTS.SHOW_SWAP_MODAL })
                 }}
-                rackLetter={
-                  turnUsedLetters.has(rackLetter.id) ? null : rackLetter
-                }
               />
-            )
-          })}
+              <div className="swap-icon-text">Swap</div>
+            </div>
+          </div>
+          <div className="board">
+            {board.map((cellNum) => {
+              return (
+                <BoardCell
+                  key={cellNum}
+                  cellNum={cellNum}
+                  letter={boardLetters[cellNum]}
+                  onDragStart={onDragStart}
+                  onLetterDropped={() => {
+                    send({
+                      cellNum,
+                      type: SCRABBLE_EVENTS.TILE_PLACED_ON_BOARD,
+                    })
+                  }}
+                />
+              )
+            })}
+          </div>
         </div>
-        <div className="board">
-          {board.map((cellNum) => {
-            return (
-              <BoardCell
-                key={cellNum}
-                cellNum={cellNum}
-                letter={boardLetters[cellNum]}
-                onDragStart={onDragStart}
-                onLetterDropped={() => {
-                  send({ cellNum, type: SCRABBLE_EVENTS.TILE_PLACED_ON_BOARD })
+        {showSwapModal && (
+          <>
+            <div className="swap-modal-overlay" />
+            <div className="swap-modal">
+              <CloseIcon
+                onClick={() => {
+                  send({ type: SCRABBLE_EVENTS.HIDE_SWAP_MODAL })
                 }}
               />
-            )
-          })}
-        </div>
+              <div className="swap-modal-content">
+                <div className="swap-modal-title">Swap Tiles</div>
+                <p>Click on tiles to swap.</p>
+                <div className="swap-modal-choose-tiles">
+                  {rackLetters.map((rackLetter) => {
+                    return (
+                      <RackLetterToSwap
+                        key={rackLetter.id}
+                        isChosenToSwap={rackLettersToSwap.has(rackLetter.id)}
+                        onClick={() => {
+                          send({
+                            id: rackLetter.id,
+                            type: SCRABBLE_EVENTS.TOGGLE_RACK_LETTER_TO_SWAP,
+                          })
+                        }}
+                        rackLetter={rackLetter}
+                      />
+                    )
+                  })}
+                </div>
+                <div className="swap-modal-actions">
+                  <Button
+                    isInverse={true}
+                    onClick={() => {
+                      send({ type: SCRABBLE_EVENTS.HIDE_SWAP_MODAL })
+                    }}
+                  >
+                    Nevermind
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      send({ type: SCRABBLE_EVENTS.SWAP_TILES })
+                    }}
+                  >
+                    Swap
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -320,16 +437,32 @@ const EnterRoomForm: React.FC<{
 }) => {
   return (
     <div className="enter-room-form">
-      <Input onChange={onChangeName} value={name} />
-      {!isJoining && <Input onChange={onChangeRoomName} value={roomName} />}
+      <label htmlFor="player-name">Your Name</label>
+      <Input
+        name="player-name"
+        onChange={onChangeName}
+        type="text"
+        value={name}
+      />
+      {!isJoining && (
+        <>
+          <label htmlFor="room-name">Room Name</label>
+          <Input
+            name="room-name"
+            onChange={onChangeRoomName}
+            type="text"
+            value={roomName}
+          />
+        </>
+      )}
       <Button onClick={onSubmit}>{isJoining ? 'Join' : 'Create Room'}</Button>
     </div>
   )
 }
 
 const RackLetter: React.FC<{
-  onDragStart: (letter: RackLetterType) => void
-  onLetterDropped: () => void
+  onDragStart?: (letter: RackLetterType) => void
+  onLetterDropped?: () => void
   rackLetter: RackLetterType | null
 }> = ({ onDragStart, onLetterDropped, rackLetter }) => {
   const letter = rackLetter?.letter
@@ -338,19 +471,30 @@ const RackLetter: React.FC<{
     event.preventDefault()
   }
 
-  function onDrop() {
-    onLetterDropped()
-  }
-
   return (
     <div
       className="rack-letter"
       draggable="true"
       onDragOver={onDragOver}
-      onDragStart={rackLetter ? () => onDragStart(rackLetter) : undefined}
-      onDrop={onDrop}
+      onDragStart={
+        rackLetter && onDragStart ? () => onDragStart(rackLetter) : undefined
+      }
+      onDrop={onLetterDropped}
     >
       {letter && <Tile letter={letter} />}
+    </div>
+  )
+}
+
+const RackLetterToSwap: React.FC<{
+  isChosenToSwap: boolean
+  onClick: () => void
+  rackLetter: RackLetterType
+}> = ({ isChosenToSwap, onClick, rackLetter }) => {
+  return (
+    <div className="rack-letter-to-swap" onClick={onClick}>
+      {isChosenToSwap && <CheckmarkIcon />}
+      <RackLetter rackLetter={rackLetter} />
     </div>
   )
 }

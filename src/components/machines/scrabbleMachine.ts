@@ -34,6 +34,7 @@ export enum ACTIONS {
   CHANGE_TURN = 'CHANGE_TURN',
   CHOOSE_PLAYER_UP = 'CHOOSE_PLAYER_UP',
   JOIN_ROOM = 'JOIN_ROOM',
+  NORMALIZE_ROOM_NAME = 'NORMALIZE_ROOM_NAME',
   PERSIST_RACK = 'PERSIST_RACK',
   PERSIST_ROOM_INFO = 'PERSIST_ROOM_INFO',
   PICK_INITIAL_LETTERS = 'PICK_INITIAL_LETTERS',
@@ -43,7 +44,12 @@ export enum ACTIONS {
   PONG_GAME_STATE_WAITING = 'PONG_GAME_STATE_WAITING',
   SET_LETTER_ON_BOARD = 'SET_LETTER_ON_BOARD',
   SET_LETTER_ON_RACK = 'SET_LETTER_ON_RACK',
+  SHUFFLE_RACK = 'SHUFFLE_RACK',
+  SWAP_MODAL_HIDE = 'SWAP_MODAL_HIDE',
+  SWAP_MODAL_SHOW = 'SWAP_MODAL_SHOW',
+  SWAP_TILES = 'SWAP_TILES',
   TALLY_SCORE = 'TALLY_SCORE',
+  TOGGLE_RACK_LETTER_TO_SWAP = 'TOGGLE_RACK_LETTER_TO_SWAP',
   TRIGGER_GAME_STARTED = 'TRIGGER_GAME_STARTED',
   TRIGGER_TURN_OVER = 'TRIGGER_TURN_OVER',
   UPDATE_DRAGGING_LETTER = 'UPDATE_DRAGGING_LETTER',
@@ -54,6 +60,7 @@ export enum ACTIONS {
   UPDATE_ROOM_HOST = 'UPDATE_ROOM_HOST',
   UPDATE_ROOM_NAME = 'UPDATE_ROOM_NAME',
   UPDATE_TURN_OVER_DATA = 'UPDATE_TURN_OVER_DATA',
+  UPDATE_URL_WITH_ROOM = 'UPDATE_URL_WITH_ROOM',
 }
 
 export enum EVENTS {
@@ -63,13 +70,18 @@ export enum EVENTS {
   GAME_STARTED = 'GAME_STARTED',
   GAME_STATE_PINGED = 'GAME_STATE_PINGED',
   GAME_STATE_RESPONSE_RECEIVED = 'GAME_STATE_RESPONSE_RECEIVED',
+  HIDE_SWAP_MODAL = 'HIDE_SWAP_MODAL',
   JOIN_ROOM = 'JOIN_ROOM',
   NAME_CHANGED = 'NAME_CHANGED',
   PLAYER_JOINED = 'PLAYER_JOINED',
   ROOM_NAME_CHANGED = 'ROOM_NAME_CHANGED',
+  SHOW_SWAP_MODAL = 'SHOW_SWAP_MODAL',
+  SHUFFLE_RACK = 'SHUFFLE_RACK',
   START_GAME = 'START_GAME',
+  SWAP_TILES = 'SWAP_TILES',
   TILE_PLACED_ON_BOARD = 'TILE_PLACED_ON_BOARD',
   TILE_PLACED_ON_RACK = 'TILE_PLACED_ON_RACK',
+  TOGGLE_RACK_LETTER_TO_SWAP = 'TOGGLE_RACK_LETTER_TO_SWAP',
   TURN_OVER = 'TURN_OVER',
   WORD_SUBMITTED = 'WORD_SUBMITTED',
 }
@@ -103,10 +115,12 @@ export interface Context {
   players: Player[]
   rackLetters: RackLetter[]
   rackLettersToBoardCells: LettersToBoardCells
+  rackLettersToSwap: Set<string>
   remainingLetters: LetterDistribution
   roomHost: string
   roomName: string
   rounds: Rounds
+  showSwapModal: boolean
   turnUsedLetters: Set<string>
 }
 
@@ -125,6 +139,7 @@ type GameStateResponseReceived = {
   data: PongGameStateData
   type: EVENTS.GAME_STATE_RESPONSE_RECEIVED
 }
+type HideSwapModal = { type: EVENTS.HIDE_SWAP_MODAL }
 type JoinRoom = { type: EVENTS.JOIN_ROOM }
 type NameChanged = {
   playerId: string
@@ -139,11 +154,18 @@ type RoomNameChanged = {
   type: EVENTS.ROOM_NAME_CHANGED
   value: string
 }
+type ShowSwapModal = { type: EVENTS.SHOW_SWAP_MODAL }
+type ShuffleRack = { type: EVENTS.SHUFFLE_RACK }
 type StartGame = { type: EVENTS.START_GAME }
+type SwapTiles = { type: EVENTS.SWAP_TILES }
 type TilePlacedOnBoard = { cellNum: number; type: EVENTS.TILE_PLACED_ON_BOARD }
 type TilePlacedOnRack = {
   rackLetterId: string
   type: EVENTS.TILE_PLACED_ON_RACK
+}
+type ToggleRackLetterToSwap = {
+  id: string
+  type: EVENTS.TOGGLE_RACK_LETTER_TO_SWAP
 }
 type TurnOver = { data: TurnOverData; type: EVENTS.TURN_OVER }
 type WordSubmitted = { type: EVENTS.WORD_SUBMITTED }
@@ -154,18 +176,24 @@ export type Events =
   | GameStarted
   | GameStatePinged
   | GameStateResponseReceived
+  | HideSwapModal
   | JoinRoom
   | NameChanged
   | PlayerJoined
   | RoomNameChanged
+  | ShowSwapModal
+  | ShuffleRack
   | StartGame
+  | SwapTiles
   | TilePlacedOnBoard
   | TilePlacedOnRack
+  | ToggleRackLetterToSwap
   | TurnOver
   | WordSubmitted
 
-const moveTileEvents = {
+const rackEvents = {
   [EVENTS.DRAG_STARTED]: { actions: [ACTIONS.UPDATE_DRAGGING_LETTER] },
+  [EVENTS.SHUFFLE_RACK]: { actions: [ACTIONS.SHUFFLE_RACK] },
   [EVENTS.TILE_PLACED_ON_BOARD]: {
     actions: [ACTIONS.SET_LETTER_ON_BOARD],
   },
@@ -183,10 +211,12 @@ export const scrabbleMachine = Machine<Context, Events>(
       players: [],
       rackLetters: [],
       rackLettersToBoardCells: {},
+      rackLettersToSwap: new Set(),
       remainingLetters: getSetOfLetters(),
       roomHost: '',
       roomName: '',
       rounds: [{}],
+      showSwapModal: false,
       turnUsedLetters: new Set(),
     },
     id: 'scrabble',
@@ -207,7 +237,12 @@ export const scrabbleMachine = Machine<Context, Events>(
           [EVENTS.NAME_CHANGED]: { actions: [ACTIONS.UPDATE_PLAYER_NAME] },
           [EVENTS.ROOM_NAME_CHANGED]: { actions: [ACTIONS.UPDATE_ROOM_NAME] },
           [EVENTS.CREATE_ROOM]: {
-            actions: [ACTIONS.UPDATE_ROOM_HOST, ACTIONS.JOIN_ROOM],
+            actions: [
+              ACTIONS.NORMALIZE_ROOM_NAME,
+              ACTIONS.UPDATE_ROOM_HOST,
+              ACTIONS.UPDATE_URL_WITH_ROOM,
+              ACTIONS.JOIN_ROOM,
+            ],
             target: [STATES.WAITING_FOR_PLAYERS],
           },
         },
@@ -282,9 +317,27 @@ export const scrabbleMachine = Machine<Context, Events>(
       },
       [STATES.PLAYING]: {
         on: {
-          ...moveTileEvents,
+          ...rackEvents,
           [EVENTS.GAME_STATE_PINGED]: {
             actions: [ACTIONS.PONG_GAME_STATE_PLAYING],
+          },
+          [EVENTS.HIDE_SWAP_MODAL]: {
+            actions: [ACTIONS.SWAP_MODAL_HIDE],
+          },
+          [EVENTS.SHOW_SWAP_MODAL]: {
+            actions: [ACTIONS.SWAP_MODAL_SHOW],
+          },
+          [EVENTS.SWAP_TILES]: {
+            actions: [
+              ACTIONS.SWAP_TILES,
+              ACTIONS.TALLY_SCORE,
+              ACTIONS.PERSIST_RACK,
+              ACTIONS.CHANGE_TURN,
+              ACTIONS.TRIGGER_TURN_OVER,
+            ],
+          },
+          [EVENTS.TOGGLE_RACK_LETTER_TO_SWAP]: {
+            actions: [ACTIONS.TOGGLE_RACK_LETTER_TO_SWAP],
           },
           [EVENTS.WORD_SUBMITTED]: {
             actions: [
@@ -301,7 +354,7 @@ export const scrabbleMachine = Machine<Context, Events>(
       },
       [STATES.WAITING_FOR_TURN]: {
         on: {
-          ...moveTileEvents,
+          ...rackEvents,
           [EVENTS.GAME_STATE_PINGED]: {
             actions: [ACTIONS.PONG_GAME_STATE_PLAYING],
           },
@@ -345,6 +398,11 @@ export const scrabbleMachine = Machine<Context, Events>(
           }
         }
       ),
+      [ACTIONS.NORMALIZE_ROOM_NAME]: assign({
+        roomName: (context): string => {
+          return context.roomName.toLowerCase().replace(/\s+/gi, '-')
+        },
+      }),
       [ACTIONS.PERSIST_RACK]: (context): void => {
         persistRack({
           rack: context.rackLetters,
@@ -522,6 +580,56 @@ export const scrabbleMachine = Machine<Context, Events>(
           }
         }
       ),
+      [ACTIONS.SHUFFLE_RACK]: assign({
+        rackLetters: (context) => {
+          return _.shuffle(context.rackLetters)
+        },
+      }),
+      [ACTIONS.SWAP_MODAL_HIDE]: assign<Context>({
+        showSwapModal: false,
+      }),
+      [ACTIONS.SWAP_MODAL_SHOW]: assign<Context>({
+        showSwapModal: true,
+      }),
+      [ACTIONS.SWAP_TILES]: assign(
+        (context): Context => {
+          const { rackLetters, rackLettersToSwap, remainingLetters } = context
+          const remainingLettersAfterSwap = { ...remainingLetters }
+
+          const lettersToSwap = rackLetters.filter((letter) => {
+            return rackLettersToSwap.has(letter.id)
+          })
+          lettersToSwap.forEach((letter) => {
+            remainingLettersAfterSwap[letter.letter] =
+              remainingLettersAfterSwap[letter.letter] + 1
+          })
+
+          const {
+            rackLetters: newRackLetters,
+            remainingLetters: newRemainingLetters,
+          } = getRackLetters({
+            numLetters: rackLettersToSwap.size,
+            remainingLetters,
+          })
+
+          let i = 0
+          const orderedNewRackLetters = rackLetters.map((letter) => {
+            if (rackLettersToSwap.has(letter.id)) {
+              return newRackLetters[i++]
+            }
+
+            return letter
+          })
+
+          return {
+            ...context,
+            rackLetters: orderedNewRackLetters,
+            rackLettersToSwap: new Set(),
+            remainingLetters: newRemainingLetters,
+            showSwapModal: false,
+          }
+        }
+      ),
       [ACTIONS.TALLY_SCORE]: assign({
         rounds: (context): Rounds => {
           const {
@@ -534,13 +642,18 @@ export const scrabbleMachine = Machine<Context, Events>(
             turnUsedLetters,
           } = context
           const newRounds = _.cloneDeep(rounds)
-          const { words } = getWordsFromLetters({
-            boardLetters,
-            lettersToBoardCells: rackLettersToBoardCells,
-            lettersToCheck: rackLetters.filter((letter) =>
-              turnUsedLetters.has(letter.id)
-            ),
-          })
+          let words: RackLetter[][] = []
+
+          if (turnUsedLetters.size > 0) {
+            const { words: wordsFromLetters } = getWordsFromLetters({
+              boardLetters,
+              lettersToBoardCells: rackLettersToBoardCells,
+              lettersToCheck: rackLetters.filter((letter) =>
+                turnUsedLetters.has(letter.id)
+              ),
+            })
+            words = wordsFromLetters
+          }
 
           let newScore = 0
           words.forEach((word) => {
@@ -552,10 +665,13 @@ export const scrabbleMachine = Machine<Context, Events>(
               })
           })
 
-          // Might want to display all words or the longest word at some point.
-          const word = words[0].reduce((sum, { letter }) => {
-            return sum + letter
-          }, '')
+          let word = ''
+          if (words.length > 0) {
+            // Might want to display all words or the longest word at some point.
+            word = words[0].reduce((sum, { letter }) => {
+              return sum + letter
+            }, '')
+          }
 
           const turnResult: TurnResult = {
             score: newScore,
@@ -572,6 +688,21 @@ export const scrabbleMachine = Machine<Context, Events>(
           }
 
           return newRounds
+        },
+      }),
+      [ACTIONS.TOGGLE_RACK_LETTER_TO_SWAP]: assign({
+        rackLettersToSwap: (context, event): Set<string> => {
+          const { rackLettersToSwap } = context
+          const { id } = event as ToggleRackLetterToSwap
+
+          const newRackLettersToSwap = new Set(rackLettersToSwap)
+          if (newRackLettersToSwap.has(id)) {
+            newRackLettersToSwap.delete(id)
+          } else {
+            newRackLettersToSwap.add(id)
+          }
+
+          return newRackLettersToSwap
         },
       }),
       [ACTIONS.TRIGGER_GAME_STARTED]: (context): void => {

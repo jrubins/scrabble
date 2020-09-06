@@ -1,11 +1,16 @@
 import React, { ReactElement } from 'react'
+import cn from 'classnames'
 
 const Button: React.FC<{
   children: ReactElement | string
+  isInverse?: boolean
   onClick: () => void
-}> = ({ children, onClick }) => {
+}> = ({ children, isInverse = false, onClick }) => {
   return (
-    <button className="button" onClick={onClick}>
+    <button
+      className={cn('button', { 'button-inverse': isInverse })}
+      onClick={onClick}
+    >
       {children}
     </button>
   )
