@@ -95,6 +95,27 @@
   &:nth-child(n + 211) {
     border-bottom: $cell-outline;
   }
+
+  .star-icon {
+    width: 24px;
+    height: 24px;
+  }
+}
+
+.board-cell-double-word {
+  background-color: $pink;
+}
+
+.board-cell-triple-word {
+  background-color: $red;
+}
+
+.board-cell-double-letter {
+  background-color: $light-blue;
+}
+
+.board-cell-triple-letter {
+  background-color: $blue;
 }
 
 .board-cell-hovered {
@@ -112,6 +133,12 @@
     width: $cell-size - 2px;
     height: $cell-size - 2px;
   }
+}
+
+.board-cell-score-multiplier {
+  font-size: 7px;
+  text-align: center;
+  text-transform: uppercase;
 }
 
 .tile {

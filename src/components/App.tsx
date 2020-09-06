@@ -2,6 +2,7 @@ import { hot } from 'react-hot-loader/root'
 import React, { DragEvent, useEffect, useState } from 'react'
 import { Route, Switch, useHistory, useParams } from 'react-router-dom'
 import { useMachine } from '@xstate/react'
+import { v4 as uuidV4 } from 'uuid'
 import cn from 'classnames'
 
 import {
@@ -12,9 +13,12 @@ import {
   Events as ScrabbleEvents,
   scrabbleMachine,
 } from './machines/scrabbleMachine'
-import { LETTER_POINTS } from '../utils/letters'
+import { LETTER_POINTS, getCellScoreMultiplier } from '../utils/letters'
 import { REALTIME_EVENTS, initRealtimeConnection } from '../utils/realtime'
 import { Member, RackLetter as RackLetterType } from '../utils/types'
+import { getPersistedUserInfo, persistUserInfo } from '../utils/storage'
+
+import StarIcon from './StarIcon'
 
 const board: number[] = []
 for (let i = 0; i < 225; i++) {
@@ -32,9 +36,18 @@ const App: React.FC = () => {
 const Room: React.FC = () => {
   const history = useHistory()
   const { room } = useParams<{ room?: string }>()
+  const persistedInfo = getPersistedUserInfo()
+  const userInfoForRoom = room ? persistedInfo[room] : null
   const [scrabbleState, send] = useMachine<ScrabbleContext, ScrabbleEvents>(
     scrabbleMachine.withContext({
       ...(scrabbleMachine.context as ScrabbleContext),
+      players: [
+        {
+          id: userInfoForRoom?.userId || uuidV4(),
+          name: userInfoForRoom?.userName || '',
+          thisPlayer: true,
+        },
+      ],
       roomName: room || '',
     }),
     {
@@ -50,6 +63,12 @@ const Room: React.FC = () => {
                 send({ data, type: SCRABBLE_EVENTS.GAME_STARTED })
               },
               [REALTIME_EVENTS.JOINED_ROOM]: (members) => {
+                persistUserInfo({
+                  roomName,
+                  userId: members.me.id,
+                  userName: members.me.info.name,
+                })
+
                 members.each(onMemberAdded)
               },
               [REALTIME_EVENTS.PLAYER_JOINED]: onMemberAdded,
@@ -242,6 +261,7 @@ const Room: React.FC = () => {
             return (
               <BoardCell
                 key={cellNum}
+                cellNum={cellNum}
                 letter={boardLetters[cellNum]}
                 onDragStart={onDragStart}
                 onLetterDropped={() => {
@@ -285,12 +305,14 @@ const RackLetter: React.FC<{
 }
 
 const BoardCell: React.FC<{
+  cellNum: number
   letter?: RackLetterType
   onDragStart: (letter: RackLetterType) => void
   onLetterDropped: () => void
-}> = ({ letter, onDragStart, onLetterDropped }) => {
+}> = ({ cellNum, letter, onDragStart, onLetterDropped }) => {
   const [isOver, setIsOver] = useState(false)
   const cellLetter = letter?.letter
+  const scoreMultiplier = getCellScoreMultiplier(cellNum)
 
   function onDragOver(event: DragEvent<HTMLDivElement>) {
     event.preventDefault()
@@ -311,6 +333,7 @@ const BoardCell: React.FC<{
       className={cn('board-cell', {
         'board-cell-hovered': isOver,
         'board-cell-taken': !!cellLetter,
+        [`board-cell-${scoreMultiplier}`]: scoreMultiplier,
       })}
       draggable="true"
       onDragLeave={onDragLeave}
@@ -319,6 +342,19 @@ const BoardCell: React.FC<{
       onDrop={onDrop}
     >
       {cellLetter && <Tile letter={cellLetter} />}
+      {cellNum === 112 && <StarIcon />}
+      {cellNum !== 112 && (
+        <div className="board-cell-score-multiplier">
+          {scoreMultiplier === 'double-word' && <span>Double Word Score</span>}
+          {scoreMultiplier === 'triple-word' && <span>Triple Word Score</span>}
+          {scoreMultiplier === 'double-letter' && (
+            <span>Double Letter Score</span>
+          )}
+          {scoreMultiplier === 'triple-letter' && (
+            <span>Triple Letter Score</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

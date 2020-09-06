@@ -1,6 +1,5 @@
 import { Machine, assign } from 'xstate'
 import _ from 'lodash'
-import { v4 as uuidV4 } from 'uuid'
 
 import {
   REALTIME_EVENTS,
@@ -11,12 +10,18 @@ import {
 import {
   BoardLetters,
   LetterDistribution,
+  LettersToBoardCells,
   Player,
   RackLetter,
   Rounds,
   TurnResult,
 } from '../../utils/types'
-import { getRackLetters, getSetOfLetters, getScore } from '../../utils/letters'
+import {
+  getRackLetters,
+  getScore,
+  getSetOfLetters,
+  getWordsFromLetters,
+} from '../../utils/letters'
 
 export enum ACTIONS {
   ADD_PLAYER = 'ADD_PLAYER',
@@ -55,6 +60,7 @@ export enum EVENTS {
 enum GUARDS {
   HAS_ROOM_NAME = 'HAS_ROOM_NAME',
   IS_UP = 'IS_UP',
+  IS_WORD_VALID = 'IS_WORD_VALID',
 }
 
 export enum STATES {
@@ -73,7 +79,7 @@ export interface Context {
   playerUp: string
   players: Player[]
   rackLetters: RackLetter[]
-  rackLettersToBoardCells: { [id: string]: number }
+  rackLettersToBoardCells: LettersToBoardCells
   remainingLetters: LetterDistribution
   roomName: string
   rounds: Rounds
@@ -139,7 +145,7 @@ export const scrabbleMachine = Machine<Context, Events>(
       boardLetters: {},
       draggingLetter: null,
       playerUp: '',
-      players: [{ id: uuidV4(), name: '', thisPlayer: true }],
+      players: [],
       rackLetters: [],
       rackLettersToBoardCells: {},
       remainingLetters: getSetOfLetters(),
@@ -209,6 +215,7 @@ export const scrabbleMachine = Machine<Context, Events>(
               ACTIONS.CHANGE_TURN,
               ACTIONS.TRIGGER_TURN_OVER,
             ],
+            cond: GUARDS.IS_WORD_VALID,
             target: STATES.WAITING_FOR_TURN,
           },
         },
@@ -391,61 +398,28 @@ export const scrabbleMachine = Machine<Context, Events>(
             turnUsedLetters,
           } = context
           const newRounds = _.cloneDeep(rounds)
-          const newScore = getScore({
-            letters: rackLetters.filter((letter) =>
+          const { words } = getWordsFromLetters({
+            boardLetters,
+            lettersToBoardCells: rackLettersToBoardCells,
+            lettersToCheck: rackLetters.filter((letter) =>
               turnUsedLetters.has(letter.id)
             ),
           })
 
-          const orderedUsedLetters = _.orderBy(
-            _.map(rackLettersToBoardCells, (boardCellNum, letterId) => ({
-              boardCellNum,
-              letterId,
-            })),
-            'boardCellNum',
-            'asc'
-          )
-          let direction = ''
-          if (
-            (orderedUsedLetters[1].boardCellNum -
-              orderedUsedLetters[0].boardCellNum) %
-              15 ===
-            0
-          ) {
-            direction = 'down'
-          } else if (
-            orderedUsedLetters[1].boardCellNum -
-              orderedUsedLetters[0].boardCellNum ===
-            1
-          ) {
-            direction = 'left'
-          } else {
-            return rounds
-          }
+          let newScore = 0
+          words.forEach((word) => {
+            newScore =
+              newScore +
+              getScore({
+                lettersToBoardCells: rackLettersToBoardCells,
+                word,
+              })
+          })
 
-          let currentCellNum = orderedUsedLetters[0].boardCellNum
-          while (true) {
-            const previousCell =
-              direction === 'down' ? currentCellNum - 15 : currentCellNum - 1
-            const letter = boardLetters[previousCell]
-            if (!letter) {
-              break
-            }
-
-            currentCellNum = previousCell
-          }
-
-          let word = ''
-          while (true) {
-            const letter = boardLetters[currentCellNum]
-            if (!letter) {
-              break
-            }
-
-            word = word + letter.letter
-            currentCellNum =
-              direction === 'down' ? currentCellNum + 15 : currentCellNum + 1
-          }
+          // Might want to display all words or the longest word at some point.
+          const word = words[0].reduce((sum, { letter }) => {
+            return sum + letter
+          }, '')
 
           const turnResult: TurnResult = {
             score: newScore,
@@ -527,6 +501,17 @@ export const scrabbleMachine = Machine<Context, Events>(
     },
     guards: {
       [GUARDS.HAS_ROOM_NAME]: (context) => !!context.roomName,
+      [GUARDS.IS_WORD_VALID]: (context) => {
+        const { allLettersUsed, words } = getWordsFromLetters({
+          boardLetters: context.boardLetters,
+          lettersToBoardCells: context.rackLettersToBoardCells,
+          lettersToCheck: context.rackLetters.filter((letter) => {
+            return context.turnUsedLetters.has(letter.id)
+          }),
+        })
+
+        return words.length > 0 && allLettersUsed
+      },
       [GUARDS.IS_UP]: (context) => {
         const { playerUp, players } = context
 
