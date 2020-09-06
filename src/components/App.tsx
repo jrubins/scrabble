@@ -141,9 +141,11 @@ const Room: React.FC = () => {
   const isWaitingForPlayers = scrabbleState.matches(
     SCRABBLE_STATES.WAITING_FOR_PLAYERS
   )
-  const isPlaying =
-    scrabbleState.matches(SCRABBLE_STATES.PLAYING) ||
-    scrabbleState.matches(SCRABBLE_STATES.WAITING_FOR_TURN)
+  const isPlaying = scrabbleState.matches(SCRABBLE_STATES.PLAYING)
+  const isWaitingForTurn = scrabbleState.matches(
+    SCRABBLE_STATES.WAITING_FOR_TURN
+  )
+  const isGameActive = isPlaying || isWaitingForTurn
   const me = getMe(players)
   const isHost = me ? me.id === roomHost : false
 
@@ -239,7 +241,7 @@ const Room: React.FC = () => {
             )}
           </div>
         )}
-        {isPlaying && (
+        {isGameActive && (
           <div className="scores-table">
             <div className="scores-header">
               <div></div>
@@ -303,11 +305,11 @@ const Room: React.FC = () => {
         <div className="playing-surface-items">
           <div className="above-board-row">
             <div className="rack-letters">
-              {!isPlaying &&
+              {!isGameActive &&
                 _.fill(new Array(7), null).map((rackLetter, i) => {
                   return <RackLetter key={i} rackLetter={rackLetter} />
                 })}
-              {isPlaying && (
+              {isGameActive && (
                 <>
                   <div className="shuffle-icon-container">
                     <ShuffleIcon
@@ -337,14 +339,16 @@ const Room: React.FC = () => {
                 </>
               )}
             </div>
-            <div className="swap-icon-container">
-              <SwapIcon
-                onClick={() => {
-                  send({ type: SCRABBLE_EVENTS.SHOW_SWAP_MODAL })
-                }}
-              />
-              <div className="swap-icon-text">Swap</div>
-            </div>
+            {isPlaying && (
+              <div className="swap-icon-container">
+                <SwapIcon
+                  onClick={() => {
+                    send({ type: SCRABBLE_EVENTS.SHOW_SWAP_MODAL })
+                  }}
+                />
+                <div className="swap-icon-text">Swap</div>
+              </div>
+            )}
           </div>
           <div className="board">
             {board.map((cellNum) => {
