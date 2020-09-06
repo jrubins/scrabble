@@ -222,59 +222,90 @@ export function getWordsFromLetters({
 }): { allLettersUsed: boolean; words: RackLetter[][] } {
   const validWords: RackLetter[][] = []
   const letterIdsVisited: Set<string> = new Set()
-
-  const cellNum = lettersToBoardCells[lettersToCheck[0].id]
+  const cellsToVisit = [lettersToBoardCells[lettersToCheck[0].id]]
   letterIdsVisited.add(lettersToCheck[0].id)
-  let cellAbove = cellNum - 15
-  const verticalWord = [lettersToCheck[0]]
-  let letterAbove = boardLetters[cellAbove]
-  while (cellAbove > 0 && letterAbove) {
-    letterIdsVisited.add(letterAbove.id)
-    verticalWord.unshift(letterAbove)
-    cellAbove = cellAbove - 15
-    letterAbove = boardLetters[cellAbove]
+
+  function addCellToVisit(letter: RackLetter) {
+    if (
+      _.find(lettersToCheck, { id: letter.id }) &&
+      !letterIdsVisited.has(letter.id)
+    ) {
+      cellsToVisit.push(lettersToBoardCells[letter.id])
+    }
   }
 
-  let cellBelow = cellNum + 15
-  let letterBelow = boardLetters[cellBelow]
-  while (cellBelow < 15 * 15 && letterBelow) {
-    letterIdsVisited.add(letterBelow.id)
-    verticalWord.push(letterBelow)
-    cellBelow = cellBelow + 15
-    letterBelow = boardLetters[cellBelow]
+  while (cellsToVisit.length > 0) {
+    const cellNum = cellsToVisit.pop()
+    if (cellNum === undefined) {
+      break
+    }
+
+    const currentLetter = boardLetters[cellNum]
+    if (!currentLetter) {
+      break
+    }
+
+    let cellAbove = cellNum - 15
+    const verticalWord = [currentLetter]
+    let letterAbove = boardLetters[cellAbove]
+    while (cellAbove > 0 && letterAbove) {
+      addCellToVisit(letterAbove)
+      letterIdsVisited.add(letterAbove.id)
+      verticalWord.unshift(letterAbove)
+      cellAbove = cellAbove - 15
+      letterAbove = boardLetters[cellAbove]
+    }
+
+    let cellBelow = cellNum + 15
+    let letterBelow = boardLetters[cellBelow]
+    while (cellBelow < 15 * 15 && letterBelow) {
+      addCellToVisit(letterBelow)
+      letterIdsVisited.add(letterBelow.id)
+      verticalWord.push(letterBelow)
+      cellBelow = cellBelow + 15
+      letterBelow = boardLetters[cellBelow]
+    }
+
+    if (verticalWord.length > 1) {
+      validWords.push(verticalWord)
+    }
+
+    let cellLeft = cellNum - 1
+    const horizontalWord = [currentLetter]
+    let letterLeft = boardLetters[cellLeft]
+    while (cellLeft > 0 && letterLeft) {
+      addCellToVisit(letterLeft)
+      letterIdsVisited.add(letterLeft.id)
+      horizontalWord.unshift(letterLeft)
+      cellLeft = cellLeft - 1
+      letterLeft = boardLetters[cellLeft]
+    }
+
+    let cellRight = cellNum + 1
+    let letterRight = boardLetters[cellRight]
+    while (cellRight < 15 * 15 && letterRight) {
+      addCellToVisit(letterRight)
+      letterIdsVisited.add(letterRight.id)
+      horizontalWord.push(letterRight)
+      cellRight = cellRight + 1
+      letterRight = boardLetters[cellRight]
+    }
+
+    if (horizontalWord.length > 1) {
+      validWords.push(horizontalWord)
+    }
   }
 
-  if (verticalWord.length > 1) {
-    validWords.push(verticalWord)
-  }
-
-  let cellLeft = cellNum - 1
-  const horizontalWord = [lettersToCheck[0]]
-  let letterLeft = boardLetters[cellLeft]
-  while (cellLeft > 0 && letterLeft) {
-    letterIdsVisited.add(letterLeft.id)
-    horizontalWord.unshift(letterLeft)
-    cellLeft = cellLeft - 1
-    letterLeft = boardLetters[cellLeft]
-  }
-
-  let cellRight = cellNum + 1
-  let letterRight = boardLetters[cellRight]
-  while (cellRight < 15 * 15 && letterRight) {
-    letterIdsVisited.add(letterRight.id)
-    horizontalWord.push(letterRight)
-    cellRight = cellRight + 1
-    letterRight = boardLetters[cellRight]
-  }
-
-  if (horizontalWord.length > 1) {
-    validWords.push(horizontalWord)
-  }
+  const dedupedValidWords = _.uniqBy(validWords, (wordArr) => {
+    return wordArr.reduce((word, currentLetter) => {
+      return word + currentLetter
+    }, '')
+  })
 
   return {
     allLettersUsed: _.every(lettersToCheck, (letter) => {
       return letterIdsVisited.has(letter.id)
     }),
-    words: validWords,
+    words: dedupedValidWords,
   }
 }
