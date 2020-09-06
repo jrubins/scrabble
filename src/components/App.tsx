@@ -15,9 +15,13 @@ import {
 } from './machines/scrabbleMachine'
 import { LETTER_POINTS, getCellScoreMultiplier } from '../utils/letters'
 import { REALTIME_EVENTS, initRealtimeConnection } from '../utils/realtime'
-import { Member, RackLetter as RackLetterType } from '../utils/types'
-import { getPersistedUserInfo, persistUserInfo } from '../utils/storage'
+import { RackLetter as RackLetterType } from '../utils/types'
+import { getMe } from '../utils/players'
+import { getPersistedInfo } from '../utils/storage'
+import { info } from '../utils/logs'
 
+import Button from './Button'
+import Input from './Input'
 import StarIcon from './StarIcon'
 
 const board: number[] = []
@@ -36,18 +40,20 @@ const App: React.FC = () => {
 const Room: React.FC = () => {
   const history = useHistory()
   const { room } = useParams<{ room?: string }>()
-  const persistedInfo = getPersistedUserInfo()
-  const userInfoForRoom = room ? persistedInfo[room] : null
+  const persistedInfo = getPersistedInfo()
+  const roomInfo = room ? persistedInfo[room] : null
   const [scrabbleState, send] = useMachine<ScrabbleContext, ScrabbleEvents>(
     scrabbleMachine.withContext({
       ...(scrabbleMachine.context as ScrabbleContext),
       players: [
         {
-          id: userInfoForRoom?.userId || uuidV4(),
-          name: userInfoForRoom?.userName || '',
+          id: roomInfo?.userId || uuidV4(),
+          name: roomInfo?.userName || '',
           thisPlayer: true,
         },
       ],
+      rackLetters: roomInfo?.rack || [],
+      roomHost: roomInfo?.roomHost || '',
       roomName: room || '',
     }),
     {
@@ -60,19 +66,41 @@ const Room: React.FC = () => {
           initRealtimeConnection({
             callbacks: {
               [REALTIME_EVENTS.GAME_STARTED]: (data) => {
+                info('Scrabble game started...')
+
                 send({ data, type: SCRABBLE_EVENTS.GAME_STARTED })
               },
               [REALTIME_EVENTS.JOINED_ROOM]: (members) => {
-                persistUserInfo({
-                  roomName,
-                  userId: members.me.id,
-                  userName: members.me.info.name,
-                })
+                info('Finished joining room. Players:', members)
 
-                members.each(onMemberAdded)
+                send({ members, type: SCRABBLE_EVENTS.FINISHED_JOINING_ROOM })
               },
-              [REALTIME_EVENTS.PLAYER_JOINED]: onMemberAdded,
+              [REALTIME_EVENTS.PING_GAME_STATE]: () => {
+                info('Received ping game state request...')
+
+                send({
+                  type: SCRABBLE_EVENTS.GAME_STATE_PINGED,
+                })
+              },
+              [REALTIME_EVENTS.PONG_GAME_STATE]: (data) => {
+                info('Received ping game state response:', data)
+
+                send({
+                  data,
+                  type: SCRABBLE_EVENTS.GAME_STATE_RESPONSE_RECEIVED,
+                })
+              },
+              [REALTIME_EVENTS.PLAYER_JOINED]: (member) => {
+                info('New player joined room. Player:', member)
+
+                send({
+                  member,
+                  type: SCRABBLE_EVENTS.PLAYER_JOINED,
+                })
+              },
               [REALTIME_EVENTS.TURN_OVER]: (data) => {
+                info('Player turn over...')
+
                 send({ data, type: SCRABBLE_EVENTS.TURN_OVER })
               },
             },
@@ -90,28 +118,26 @@ const Room: React.FC = () => {
     playerUp,
     players,
     rackLetters,
+    roomHost,
     roomName,
     rounds,
     turnUsedLetters,
   } = scrabbleState.context
   const isCreatingRoom = scrabbleState.matches(SCRABBLE_STATES.CREATING_ROOM)
   const isJoiningRoom = scrabbleState.matches(SCRABBLE_STATES.JOINING_ROOM)
+  const isDeterminingGameState = scrabbleState.matches(
+    SCRABBLE_STATES.DETERMINING_GAME_STATE
+  )
   const isWaitingForPlayers = scrabbleState.matches(
     SCRABBLE_STATES.WAITING_FOR_PLAYERS
   )
+  const isPlaying =
+    scrabbleState.matches(SCRABBLE_STATES.PLAYING) ||
+    scrabbleState.matches(SCRABBLE_STATES.WAITING_FOR_TURN)
+  const me = getMe(players)
 
   function onDragStart(letter: RackLetterType) {
     send({ letter, type: SCRABBLE_EVENTS.DRAG_STARTED })
-  }
-
-  function onMemberAdded(member: Member) {
-    const { id, info } = member
-
-    send({
-      id,
-      name: info.name,
-      type: SCRABBLE_EVENTS.PLAYER_JOINED,
-    })
   }
 
   useEffect(() => {
@@ -133,54 +159,64 @@ const Room: React.FC = () => {
       <div className="sidebar">
         <div className="sidebar-logo">Scrabble</div>
         {(isCreatingRoom || isJoiningRoom) && (
+          <EnterRoomForm
+            isJoining={isJoiningRoom}
+            name={players[0].name}
+            onChangeName={(value) => {
+              send({
+                playerId: players[0].id,
+                type: SCRABBLE_EVENTS.NAME_CHANGED,
+                value,
+              })
+            }}
+            onChangeRoomName={(value) => {
+              send({
+                type: SCRABBLE_EVENTS.ROOM_NAME_CHANGED,
+                value,
+              })
+            }}
+            onSubmit={() => {
+              if (isJoiningRoom) {
+                send({ type: SCRABBLE_EVENTS.JOIN_ROOM })
+              } else {
+                send({ type: SCRABBLE_EVENTS.CREATE_ROOM })
+                history.push(`/${roomName}`)
+              }
+            }}
+            roomName={roomName}
+          />
+        )}
+        {isDeterminingGameState && <div>Loading...</div>}
+        {isWaitingForPlayers && (
           <div>
-            <input
-              onChange={(event) => {
-                send({
-                  playerId: players[0].id,
-                  type: SCRABBLE_EVENTS.NAME_CHANGED,
-                  value: event.target.value,
-                })
-              }}
-              placeholder="your name"
-              type="text"
-              value={players[0].name}
-            />
-            {isJoiningRoom && (
-              <button
-                onClick={() => {
-                  send({ type: SCRABBLE_EVENTS.JOIN_ROOM })
-                }}
-              >
-                Join
-              </button>
-            )}
-            {isCreatingRoom && (
+            {players.length < 2 && <div>Waiting for players to join...</div>}
+            {players.length >= 2 && (
               <>
-                <input
-                  onChange={(event) => {
-                    send({
-                      type: SCRABBLE_EVENTS.ROOM_NAME_CHANGED,
-                      value: event.target.value,
-                    })
-                  }}
-                  placeholder="room name"
-                  type="text"
-                  value={roomName}
-                />
-                <button
-                  onClick={() => {
-                    send({ type: SCRABBLE_EVENTS.CREATE_ROOM })
-                    history.push(`/${roomName}`)
-                  }}
-                >
-                  Create Room
-                </button>
+                <div>
+                  <div>Players</div>
+                  {players.map((player) => {
+                    return (
+                      <div key={player.id}>
+                        {player.name}
+                        {player.thisPlayer ? '(You)' : ''}
+                      </div>
+                    )
+                  })}
+                </div>
+                {players.length === 2 && me?.id === roomHost && (
+                  <Button
+                    onClick={() => {
+                      send({ type: SCRABBLE_EVENTS.START_GAME })
+                    }}
+                  >
+                    Start Game
+                  </Button>
+                )}
               </>
             )}
           </div>
         )}
-        {!isCreatingRoom && (
+        {isPlaying && (
           <div className="scores-table">
             <div className="scores-header">
               <div></div>
@@ -226,15 +262,6 @@ const Room: React.FC = () => {
             </div>
           </div>
         )}
-        {isWaitingForPlayers && (
-          <button
-            onClick={() => {
-              send({ type: SCRABBLE_EVENTS.START_GAME })
-            }}
-          >
-            Start Game
-          </button>
-        )}
       </div>
       <div className="playing-surface">
         <div className="rack-letters">
@@ -272,6 +299,30 @@ const Room: React.FC = () => {
           })}
         </div>
       </div>
+    </div>
+  )
+}
+
+const EnterRoomForm: React.FC<{
+  isJoining: boolean
+  name: string
+  onChangeName: (value: string) => void
+  onChangeRoomName: (value: string) => void
+  onSubmit: () => void
+  roomName: string
+}> = ({
+  isJoining,
+  name,
+  onChangeName,
+  onChangeRoomName,
+  onSubmit,
+  roomName,
+}) => {
+  return (
+    <div className="enter-room-form">
+      <Input onChange={onChangeName} value={name} />
+      {!isJoining && <Input onChange={onChangeRoomName} value={roomName} />}
+      <Button onClick={onSubmit}>{isJoining ? 'Join' : 'Create Room'}</Button>
     </div>
   )
 }

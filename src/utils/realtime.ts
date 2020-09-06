@@ -12,6 +12,8 @@ import {
 export enum REALTIME_EVENTS {
   GAME_STARTED = 'client-game_started',
   JOINED_ROOM = 'pusher:subscription_succeeded',
+  PING_GAME_STATE = 'client-game_state_ping',
+  PONG_GAME_STATE = 'client-game_state_pong',
   PLAYER_JOINED = 'pusher:member_added',
   TURN_OVER = 'client-turn_over',
 }
@@ -19,6 +21,8 @@ export enum REALTIME_EVENTS {
 interface EventCallbacks {
   [REALTIME_EVENTS.GAME_STARTED]: (data: GameStartedData) => void
   [REALTIME_EVENTS.JOINED_ROOM]: (members: Members) => void
+  [REALTIME_EVENTS.PING_GAME_STATE]: () => void
+  [REALTIME_EVENTS.PONG_GAME_STATE]: (data: PongGameStateData) => void
   [REALTIME_EVENTS.PLAYER_JOINED]: (member: Member) => void
   [REALTIME_EVENTS.TURN_OVER]: (data: TurnOverData) => void
 }
@@ -27,6 +31,18 @@ export interface GameStartedData {
   playerUp: string
   remainingLetters: LetterDistribution
 }
+
+export type PongGameStateData =
+  | {
+      stage: 'waiting'
+    }
+  | {
+      boardLetters: BoardLetters
+      playerUp: string
+      remainingLetters: LetterDistribution
+      rounds: Rounds
+      stage: 'playing'
+    }
 
 export interface TurnOverData {
   boardLetters: BoardLetters
@@ -75,19 +91,29 @@ export function initRealtimeConnection({
 }
 
 /**
- * Sends an event.
+ * Sends an event. Note that data is required even
+ * if it's an empty object.
  */
 export function publishEvent<T extends REALTIME_EVENTS>({
   data,
   eventName,
-}: {
-  data: T extends REALTIME_EVENTS.GAME_STARTED
-    ? GameStartedData
-    : T extends REALTIME_EVENTS.TURN_OVER
-    ? TurnOverData
-    : never
-  eventName: T
-}) {
+}:
+  | {
+      data: GameStartedData
+      eventName: REALTIME_EVENTS.GAME_STARTED
+    }
+  | {
+      data: TurnOverData
+      eventName: REALTIME_EVENTS.TURN_OVER
+    }
+  | {
+      data: {}
+      eventName: REALTIME_EVENTS.PING_GAME_STATE
+    }
+  | {
+      data: PongGameStateData
+      eventName: REALTIME_EVENTS.PONG_GAME_STATE
+    }) {
   if (!subscription) {
     return
   }

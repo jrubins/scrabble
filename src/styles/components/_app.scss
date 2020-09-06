@@ -13,6 +13,7 @@
 .sidebar-logo {
   font-family: 'Caveat';
   font-size: 40px;
+  line-height: 1;
 }
 
 .scores-header,
@@ -166,4 +167,21 @@
 
 .tile-points {
   font-size: 10px;
+}
+
+.input {
+  width: 100%;
+  height: 35px;
+  padding: 0 10px;
+  border: 1px solid $black;
+}
+
+.button {
+  width: 100%;
+  height: 35px;
+  border: 1px solid $black;
+  background: none;
+
+  font-size: 12px;
+  text-transform: uppercase;
 }
